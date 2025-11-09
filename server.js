@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const CryptoJS = require('crypto-js');
+const crypto = require('crypto'); // <-- НОВЫЙ: встроенный crypto
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
@@ -39,26 +39,37 @@ app.get('/user/:id', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'catclicker.html'));
 });
 
-// === АВТОРИЗАЦИЯ ===
+// === АВТОРИЗАЦИЯ (ТОЧНАЯ ПРОВЕРКА ПОДПИСИ) ===
 app.get('/auth/telegram', (req, res) => {
   const { hash, ...data } = req.query;
   if (!hash || !data.id) return res.status(400).send('Нет данных');
 
-  const dataCheckString = Object.keys(data).sort().map(k => `${k}=${data[k]}`).join('\n');
-  const secret = CryptoJS.HmacSHA256(dataCheckString, BOT_TOKEN);
-  if (hash !== secret.toString(CryptoJS.enc.Hex)) {
+  // === ОФИЦИАЛЬНАЯ ПРОВЕРКА ИЗ ДОКИ TELEGRAM ===
+  const dataCheckArr = [];
+  for (const key in data) {
+    if (key !== 'hash') {
+      dataCheckArr.push(`${key}=${data[key]}`);
+    }
+  }
+  dataCheckArr.sort();
+  const dataCheckString = dataCheckArr.join('\n');
+
+  const secretKey = crypto.createHash('sha256').update(BOT_TOKEN).digest();
+  const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+  if (calculatedHash !== hash) {
+    console.log('❌ Подпись не совпала:', { expected: calculatedHash, received: hash });
     return res.status(403).send('Неверная подпись');
   }
+  // === КОНЕЦ ПРОВЕРКИ ===
 
-  const { id, first_name = 'Игрок' } = data;
+  const { id, first_name = 'Игрок', username = '' } = data;
 
-  // Сохраняем пользователя
   db.get('SELECT * FROM users WHERE telegram_id = ?', [id], (err, user) => {
     if (!user) {
-      db.run('INSERT INTO users (telegram_id, first_name) VALUES (?, ?)', [id, first_name]);
+      db.run('INSERT INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)', [id, username, first_name]);
     }
 
-    // === РЕДИРЕКТ В БОТА ===
     const botLink = `https://t.me/${BOT_USERNAME}?start=play_${id}`;
     res.send(`
       <h2>Привет, ${first_name}!</h2>
