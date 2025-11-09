@@ -1,22 +1,53 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Котик Кликер</title>
-  <style>
-    body { font-family: 'Courier New', monospace; background: #000; color: #0f0; text-align: center; padding: 50px; }
-    h1 { text-shadow: 0 0 10px #0f0; }
-  </style>
-  <script async src="https://telegram.org/js/telegram-widget.js?22"
-          data-telegram-login="catclickerreg_bot"
-          data-size="large"
-          data-auth-url="/auth/telegram"
-          data-request-access="write">
-  </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Котик Кликер</title>
+    <style>
+        body { 
+            font-family: 'Courier New', monospace; 
+            background: #000; 
+            color: #0f0; 
+            text-align: center; 
+            padding: 50px; 
+            margin: 0;
+        }
+        h1 { 
+            text-shadow: 0 0 10px #0f0; 
+            font-size: 2.5em; 
+        }
+        p { 
+            font-size: 1.2em; 
+        }
+        .telegram-login {
+            margin: 30px auto;
+        }
+    </style>
 </head>
 <body>
-  <h1>Котик Кликер</h1>
-  <p>Войди через Telegram — и твой прогресс сохранится навсегда!</p>
+    <h1>Котик Кликер</h1>
+    <p>Войди через Telegram — и твой прогресс сохранится навсегда!</p>
+
+    <!-- Telegram Login Widget -->
+    <div class="telegram-login">
+        <script 
+            async 
+            src="https://telegram.org/js/telegram-widget.js?22" 
+            data-telegram-login="catclickerreg_bot"
+            data-size="large"
+            data-onauth="onTelegramAuth(user)"
+            data-request-access="write">
+        </script>
+    </div>
+
+    <script>
+        function onTelegramAuth(user) {
+            console.log('Авторизован:', user);
+            // Сохраняем ID и редиректим
+            localStorage.setItem('tgId', user.id);
+            window.location.href = '/user/' + user.id;
+        }
+    </script>
 </body>
 </html>
