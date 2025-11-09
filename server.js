@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const crypto = require('crypto'); // <-- НОВЫЙ: встроенный crypto
+const crypto = require('crypto');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
@@ -29,47 +29,53 @@ db.run(`CREATE TABLE IF NOT EXISTS users (
 
 app.use(express.static('public'));
 
-// === ГЛАВНАЯ ===
+// Главная
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// === ИГРА ===
+// Игра
 app.get('/user/:id', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'catclicker.html'));
 });
 
-// === АВТОРИЗАЦИЯ (ТОЧНАЯ ПРОВЕРКА ПОДПИСИ) ===
+// === АВТОРИЗАЦИЯ (100% ПО ДОКЕ TELEGRAM) ===
 app.get('/auth/telegram', (req, res) => {
   const { hash, ...data } = req.query;
-  if (!hash || !data.id) return res.status(400).send('Нет данных');
-
-  // === ОФИЦИАЛЬНАЯ ПРОВЕРКА ИЗ ДОКИ TELEGRAM ===
-  const dataCheckArr = [];
-  for (const key in data) {
-    if (key !== 'hash') {
-      dataCheckArr.push(`${key}=${data[key]}`);
-    }
+  if (!hash || !data.id) {
+    return res.status(400).send('Нет данных');
   }
-  dataCheckArr.sort();
+
+  // Формируем строку: key=value\nkey=value
+  const dataCheckArr = Object.keys(data)
+    .filter(key => key !== 'hash')
+    .sort()
+    .map(key => `${key}=${data[key]}`);
   const dataCheckString = dataCheckArr.join('\n');
 
+  // secret_key = SHA256(BOT_TOKEN)
   const secretKey = crypto.createHash('sha256').update(BOT_TOKEN).digest();
-  const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+  // hash = HMAC_SHA256(dataCheckString, secret_key)
+  const calculatedHash = crypto
+    .createHmac('sha256', secretKey)
+    .update(dataCheckString)
+    .digest('hex');
 
   if (calculatedHash !== hash) {
     console.log('❌ Подпись не совпала:', { expected: calculatedHash, received: hash });
     return res.status(403).send('Неверная подпись');
   }
-  // === КОНЕЦ ПРОВЕРКИ ===
 
   const { id, first_name = 'Игрок', username = '' } = data;
 
+  // Сохраняем пользователя
   db.get('SELECT * FROM users WHERE telegram_id = ?', [id], (err, user) => {
     if (!user) {
       db.run('INSERT INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)', [id, username, first_name]);
     }
 
+    // Редирект в бота
     const botLink = `https://t.me/${BOT_USERNAME}?start=play_${id}`;
     res.send(`
       <h2>Привет, ${first_name}!</h2>
@@ -82,7 +88,7 @@ app.get('/auth/telegram', (req, res) => {
   });
 });
 
-// === API ===
+// === API ПРОГРЕССА ===
 app.get('/load-progress/:id', (req, res) => {
   const { id } = req.params;
   db.get('SELECT * FROM users WHERE telegram_id = ?', [id], (err, user) => {
