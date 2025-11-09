@@ -1,0 +1,61 @@
+<script>
+  let coins = 0, perClick = 1, autoPerSec = 0, clickMulti = 1, autoLevel = 0, clickLevel = 0;
+  let telegramId = localStorage.getItem('tgId') || new URLSearchParams(window.location.search).get('id');
+
+  const cat = document.getElementById('cat');
+  const coinsEl = document.getElementById('coins');
+  const perClickEl = document.getElementById('perClick');
+  const autoEl = document.getElementById('auto');
+
+  async function loadProgress() {
+    if (!telegramId) return;
+    try {
+      const res = await fetch(`/load-progress/${telegramId}`);
+      const data = await res.json();
+      if (data.coins !== undefined) {
+        coins = data.coins; perClick = data.perClick; autoPerSec = data.autoPerSec;
+        clickMulti = data.clickMulti; autoLevel = data.autoLevel; clickLevel = data.clickLevel;
+        updateDisplay();
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  async function saveProgress() {
+    if (!telegramId) return;
+    await fetch('/save-progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegramId, coins, perClick, autoPerSec, clickMulti, autoLevel, clickLevel })
+    });
+  }
+
+  function updateDisplay() {
+    coinsEl.textContent = `Монеты: ${Math.floor(coins)}`;
+    perClickEl.textContent = perClick * clickMulti;
+    autoEl.textContent = autoPerSec;
+    saveProgress();
+  }
+
+  cat.addEventListener('click', () => { coins += perClick * clickMulti; updateDisplay(); });
+
+  setInterval(() => { coins += autoPerSec; updateDisplay(); }, 1000);
+
+  // Твои апгрейды — добавь saveProgress() после updateDisplay()
+  document.getElementById('upgradeClick').addEventListener('click', () => {
+    const cost = 10 * Math.pow(2, clickLevel);
+    if (coins >= cost) { coins -= cost; clickLevel++; clickMulti *= 2; updateUpgrade('upgradeClick', 10 * Math.pow(2, clickLevel)); updateDisplay(); }
+  });
+
+  // ... остальные апгрейды аналогично
+
+  function updateUpgrade(id, newCost) {
+    const el = document.getElementById(id);
+    if (id === 'upgradeClick') el.textContent = `Улучшить гладь (x${clickMulti * 2}) - ${newCost} монет`;
+    else if (id === 'upgradeAuto') el.textContent = `Авто-гладильщик (+${clickMulti}/сек) - ${newCost} монет`;
+    el.disabled = coins < newCost;
+  }
+
+  // Автосейв
+  setInterval(saveProgress, 10000);
+  loadProgress();
+</script>
