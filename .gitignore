@@ -1,0 +1,4 @@
+node_modules/
+catclicker.db
+.env
+.DS_Store
